@@ -15,12 +15,13 @@ WORKDIR /src
 COPY ["WebAppDotNet10.csproj", "./"]
 RUN dotnet restore "./WebAppDotNet10.csproj"
 COPY . .
-WORKDIR "/src/WebAppDotNet10"
+WORKDIR "/src"
 RUN dotnet build "./WebAppDotNet10.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 # Esta fase é usada para publicar o projeto de serviço a ser copiado para a fase final
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
+WORKDIR "/src"
 RUN dotnet publish "./WebAppDotNet10.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 # Esta fase é usada na produção ou quando executada no VS no modo normal (padrão quando não está usando a configuração de Depuração)
