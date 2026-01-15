@@ -12,8 +12,8 @@ EXPOSE 8081
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["WebAppDotNet10/WebAppDotNet10.csproj", "WebAppDotNet10/"]
-RUN dotnet restore "./WebAppDotNet10/WebAppDotNet10.csproj"
+COPY ["WebAppDotNet10.csproj", "./"]
+RUN dotnet restore "./WebAppDotNet10.csproj"
 COPY . .
 WORKDIR "/src/WebAppDotNet10"
 RUN dotnet build "./WebAppDotNet10.csproj" -c $BUILD_CONFIGURATION -o /app/build
