@@ -26,75 +26,111 @@ jobs:
             const title = pr.title.toLowerCase();
             const body = (pr.body || '').toLowerCase();
             
-            // Obter files alterados
-            const { data: files } = await github.rest.pulls.listFiles({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: pr.number
-            });
-            
-            const labelsToAdd = new Set();
-            
-            // Análise do título e descrição
-            if (title.includes('bug') || title.includes('fix') || body.includes('bug')) {
-              labelsToAdd.add('bug');
-            }
-            
-            if (title.includes('feature') || title.includes('feat') || body.includes('feature')) {
-              labelsToAdd.add('feature');
-            }
-            
-            if (title.includes('doc') || body.includes('doc')) {
-              labelsToAdd.add('documentation');
-            }
-            
-            if (title.includes('refactor') || body.includes('refactor')) {
-              labelsToAdd.add('enhancement');
-            }
-            
-            // Análise dos arquivos alterados
-            const changedFiles = files.map(f => f.filename.toLowerCase());
-            
-            const hasDocChanges = changedFiles.some(f => 
-              f.includes('readme') || f.includes('doc/') || f.includes('docs/')
-            );
-            
-            const hasTestChanges = changedFiles.some(f => 
-              f.includes('test') || f.includes('tests/')
-            );
-            
-            const hasCriticalChanges = changedFiles.some(f =>
-              f.includes('program.cs') || f.includes('dockerfile') || f.includes('.csproj')
-            );
-            
-            if (hasDocChanges) {
-              labelsToAdd.add('documentation');
-            }
-            
-            if (hasCriticalChanges) {
-              labelsToAdd.add('priority: high');
-            }
-            
-            // Detectar prioridade por keywords
-            if (title.includes('urgent') || title.includes('critical') || body.includes('urgent')) {
-              labelsToAdd.add('priority: high');
-            }
-            
-            if (title.includes('low priority') || body.includes('low priority')) {
-              labelsToAdd.add('priority: low');
-            } else if (!labelsToAdd.has('priority: high') && !title.includes('hotfix')) {
-              labelsToAdd.add('priority: medium');
-            }
-            
-            // Adicionar labels
-            if (labelsToAdd.size > 0) {
-              await github.rest.issues.addLabels({
+            try {
+              // Obter files alterados
+              const { data: files } = await github.rest.pulls.listFiles({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                issue_number: pr.number,
-                labels: Array.from(labelsToAdd)
+                pull_number: pr.number
               });
-              console.log(`✅ Labels adicionadas: ${Array.from(labelsToAdd).join(', ')}`);
-            } else {
-              console.log('ℹ️ Nenhuma label automática aplicável');
+              
+              const labelsToAdd = new Set();
+              const priorityLabels = new Set(['priority: high', 'priority: medium', 'priority: low']);
+              const allAutoLabels = new Set([
+                'bug', 'feature', 'documentation', 'enhancement',
+                'priority: high', 'priority: medium', 'priority: low'
+              ]);
+              
+              // Análise do título e descrição
+              if (title.includes('bug') || title.includes('fix') || body.includes('bug')) {
+                labelsToAdd.add('bug');
+              }
+              
+              if (title.includes('feature') || title.includes('feat') || body.includes('feature')) {
+                labelsToAdd.add('feature');
+              }
+              
+              if (title.includes('doc') || body.includes('doc')) {
+                labelsToAdd.add('documentation');
+              }
+              
+              if (title.includes('refactor') || body.includes('refactor')) {
+                labelsToAdd.add('enhancement');
+              }
+              
+              // Análise dos arquivos alterados
+              const changedFiles = files.map(f => f.filename.toLowerCase());
+              
+              const hasDocChanges = changedFiles.some(f => 
+                f.includes('readme') || f.includes('doc/') || f.includes('docs/')
+              );
+              
+              const hasTestChanges = changedFiles.some(f => 
+                f.includes('test') || f.includes('tests/')
+              );
+              
+              const hasCriticalChanges = changedFiles.some(f =>
+                f.includes('program.cs') || f.includes('dockerfile') || f.includes('.csproj') || f.includes('appsettings')
+              );
+              
+              if (hasDocChanges) {
+                labelsToAdd.add('documentation');
+              }
+              
+              // Detectar prioridade (exclusiva - apenas uma)
+              let priority = 'priority: medium'; // padrão
+              
+              if (title.includes('hotfix') || title.includes('[urgent]') || title.includes('urgent') || 
+                  title.includes('critical') || body.includes('urgent') || body.includes('critical') ||
+                  hasCriticalChanges) {
+                priority = 'priority: high';
+              } else if (title.includes('low priority') || body.includes('low priority')) {
+                priority = 'priority: low';
+              }
+              
+              labelsToAdd.add(priority);
+              
+              // Remover labels antigas de prioridade se existentes (ao editar)
+              const currentLabels = pr.labels.map(l => l.name);
+              const labelsToRemove = currentLabels.filter(label => 
+                allAutoLabels.has(label) && !labelsToAdd.has(label)
+              );
+              
+              // Remover labels antigas
+              for (const label of labelsToRemove) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: pr.number,
+                    name: label
+                  });
+                  console.log(`🗑️ Label removida: ${label}`);
+                } catch (error) {
+                  console.warn(`⚠️ Não foi possível remover label "${label}":`, error.message);
+                }
+              }
+              
+              // Adicionar novas labels
+              const labelsToAddFiltered = Array.from(labelsToAdd).filter(
+                label => !currentLabels.includes(label)
+              );
+              
+              if (labelsToAddFiltered.length > 0) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  labels: labelsToAddFiltered
+                });
+                console.log(`✅ Labels adicionadas: ${labelsToAddFiltered.join(', ')}`);
+              } else {
+                console.log('ℹ️ Labels já estão atualizadas');
+              }
+              
+              console.log(`📝 Resumo: ${Array.from(labelsToAdd).join(', ')}`);
+              
+            } catch (error) {
+              console.error('❌ Erro ao processar labels:', error.message);
+              throw error;
             }
