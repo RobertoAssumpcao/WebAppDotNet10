@@ -1,0 +1,100 @@
+name: Auto Label PR
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+    
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  labeler:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Auto Label PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const title = pr.title.toLowerCase();
+            const body = (pr.body || '').toLowerCase();
+            
+            // Obter files alterados
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number
+            });
+            
+            const labelsToAdd = new Set();
+            
+            // Análise do título e descrição
+            if (title.includes('bug') || title.includes('fix') || body.includes('bug')) {
+              labelsToAdd.add('bug');
+            }
+            
+            if (title.includes('feature') || title.includes('feat') || body.includes('feature')) {
+              labelsToAdd.add('feature');
+            }
+            
+            if (title.includes('doc') || body.includes('doc')) {
+              labelsToAdd.add('documentation');
+            }
+            
+            if (title.includes('refactor') || body.includes('refactor')) {
+              labelsToAdd.add('enhancement');
+            }
+            
+            // Análise dos arquivos alterados
+            const changedFiles = files.map(f => f.filename.toLowerCase());
+            
+            const hasDocChanges = changedFiles.some(f => 
+              f.includes('readme') || f.includes('doc/') || f.includes('docs/')
+            );
+            
+            const hasTestChanges = changedFiles.some(f => 
+              f.includes('test') || f.includes('tests/')
+            );
+            
+            const hasCriticalChanges = changedFiles.some(f =>
+              f.includes('program.cs') || f.includes('dockerfile') || f.includes('.csproj')
+            );
+            
+            if (hasDocChanges) {
+              labelsToAdd.add('documentation');
+            }
+            
+            if (hasCriticalChanges) {
+              labelsToAdd.add('priority: high');
+            }
+            
+            // Detectar prioridade por keywords
+            if (title.includes('urgent') || title.includes('critical') || body.includes('urgent')) {
+              labelsToAdd.add('priority: high');
+            }
+            
+            if (title.includes('low priority') || body.includes('low priority')) {
+              labelsToAdd.add('priority: low');
+            } else if (!labelsToAdd.has('priority: high') && !title.includes('hotfix')) {
+              labelsToAdd.add('priority: medium');
+            }
+            
+            // Adicionar labels
+            if (labelsToAdd.size > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: Array.from(labelsToAdd)
+              });
+              console.log(`✅ Labels adicionadas: ${Array.from(labelsToAdd).join(', ')}`);
+            } else {
+              console.log('ℹ️ Nenhuma label automática aplicável');
+            }
