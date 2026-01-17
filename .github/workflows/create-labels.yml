@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - main
+      - develop
+      - 'feature/**'
+      - 'hotfix/**'
     paths:
       - '.github/labels.json'  # Executa quando o arquivo de labels é atualizado
 
