@@ -1,0 +1,77 @@
+name: Create Labels
+
+on:
+  workflow_dispatch:  # Permite executar manualmente
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/labels.json'  # Executa quando o arquivo de labels é atualizado
+
+jobs:
+  create-labels:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create/Update Labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = '.github/labels.json';
+            
+            // Define labels padrão caso o arquivo não exista
+            let labels = [
+              { name: 'bug', color: 'd73a4a', description: 'Something isn\'t working' },
+              { name: 'feature', color: '0e8a16', description: 'New feature or request' },
+              { name: 'documentation', color: '0075ca', description: 'Improvements or additions to documentation' },
+              { name: 'enhancement', color: 'a2eeef', description: 'Enhancement to existing functionality' },
+              { name: 'help wanted', color: '008672', description: 'Extra attention is needed' },
+              { name: 'priority: high', color: 'd93f0b', description: 'High priority' },
+              { name: 'priority: medium', color: 'fbca04', description: 'Medium priority' },
+              { name: 'priority: low', color: 'c5def5', description: 'Low priority' },
+              { name: 'wontfix', color: 'ffffff', description: 'This will not be worked on' }
+            ];
+            
+            // Se o arquivo existe, usa as labels definidas nele
+            if (fs.existsSync(path)) {
+              labels = JSON.parse(fs.readFileSync(path, 'utf8'));
+            }
+            
+            for (const label of labels) {
+              try {
+                // Tenta criar a label
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label.name,
+                  color: label.color,
+                  description: label.description || ''
+                });
+                console.log(`✅ Label "${label.name}" criada com sucesso`);
+              } catch (error) {
+                if (error.status === 422) {
+                  // Label já existe, então atualiza
+                  try {
+                    await github.rest.issues.updateLabel({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      name: label.name,
+                      color: label.color,
+                      description: label.description || ''
+                    });
+                    console.log(`🔄 Label "${label.name}" atualizada com sucesso`);
+                  } catch (updateError) {
+                    console.error(`❌ Erro ao atualizar label "${label.name}":`, updateError.message);
+                  }
+                } else {
+                  console.error(`❌ Erro ao criar label "${label.name}":`, error.message);
+                }
+              }
+            }
