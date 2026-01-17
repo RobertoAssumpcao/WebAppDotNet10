@@ -1,3 +1,8 @@
 <Solution>
+  <Project Path="Domain/Domain.csproj" Id="72160ee9-ccc4-41ff-8cbe-907838741372" />
+  <Project Path="Entities/Entities.csproj" Id="9fe1dab2-1360-441f-8263-ff783b68d11d" />
+  <Project Path="Helpers/Helpers.csproj" Id="adb169cb-5005-4ca4-81ef-a520ebe52245" />
+  <Project Path="Infrastructure/Infrastructure.csproj" Id="68337e43-81b0-4bb7-9fda-d733634f2185" />
+  <Project Path="Tests/Tests.csproj" Id="0bee5c60-f3ec-4fe1-b98a-97dc3510f1cf" />
   <Project Path="WebAppDotNet10/WebAppDotNet10.csproj" />
 </Solution>
