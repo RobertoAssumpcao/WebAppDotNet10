@@ -6,9 +6,11 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    target-branch: "develop"
   - package-ecosystem: "nuget"
     directory: "/WebAppDotNet10"
     schedule:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    target-branch: "develop"
